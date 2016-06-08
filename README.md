@@ -2,4 +2,5 @@
 
 MPEG Transport Stream
 
-Currently just messing around with Nom to parse packets, we'll see where this goes.
+Was using nom, but decided that it is not suited for this type of parsing. Back
+to the brain storm. 
