@@ -22,7 +22,12 @@ impl<'a> Stream<'a> {
             self.position += 1;
             Ok(v)
         } else if self.bit_marker > 0 && self.position < self.data.len() - 1 {
-            Ok(0) // TODO
+            // Get ms bits
+            let mut v = self.data[self.position] & !(self.bit_marker - 1);
+            self.position += 1;
+            // Get ls bits
+            v |= self.data[self.position] & (self.bit_marker - 1);
+            Ok(v)
         } else {
             Err("Requested byte, but not enough data remains")
         }
@@ -80,6 +85,17 @@ fn test_pull_bit() {
     assert_eq!(stream.pull_bit().unwrap(), false);
     assert_eq!(stream.pull_bit().unwrap(), false);
     assert_eq!(stream.pull_bit().unwrap(), true);
+    assert_eq!(stream.pull_bit().unwrap(), false);
+    assert_eq!(stream.pull_bit().unwrap(), true);
+}
+
+#[test]
+fn test_pull_byte_not_alligned() {
+    let data: [u8; 2] = [0b10000000, 0b11111101];
+    let mut stream = Stream::new(&data[..]);
+
+    assert_eq!(stream.pull_bit().unwrap(), false);
+    assert_eq!(stream.pull_byte().unwrap(), 0b10000001);
     assert_eq!(stream.pull_bit().unwrap(), false);
     assert_eq!(stream.pull_bit().unwrap(), true);
 }
