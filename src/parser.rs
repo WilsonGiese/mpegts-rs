@@ -21,7 +21,7 @@ impl<'a> Stream<'a> {
             let v = self.data[self.position];
             self.position += 1;
             Ok(v)
-        } else if self.bit_marker > 0 && self.position < self.data.len() - 1 {
+        } else if self.bit_marker > 1 && self.position < self.data.len() - 1 {
             // Get ms bits
             let mut v = self.data[self.position] & !(self.bit_marker - 1);
             self.position += 1;
