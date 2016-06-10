@@ -2,8 +2,9 @@ use super::{ PTSPacket };
 
 struct Stream<'a> {
     data: &'a[u8],
-    position :usize,
-    bit_marker: u8,
+    position :usize,  // Current byte position in data
+    bit_marker: u8,   // Current bit position in data
+    bit_position: u8, // Position of marked bit (Basically tracking log2(bit_marker))
 }
 
 impl<'a> Stream<'a> {
@@ -13,42 +14,60 @@ impl<'a> Stream<'a> {
             data: data,
             position: 0,
             bit_marker: 1,
+            bit_position: 0,
         }
     }
 
+    /// Pull a single byte from the stream (only allowed if bit position is alligned)
     fn pull_byte(&mut self) -> Result<u8, &'static str> {
-        if self.bit_marker == 1 && self.position < self.data.len() {
+        if self.bit_marker > 1 {
+            Err("Requested byte, but bits have already been pulled from the current byte")
+        } else if self.position >= self.data.len() {
+            Err("No data remaining")
+        } else {
             let v = self.data[self.position];
             self.position += 1;
             Ok(v)
-        } else if self.bit_marker > 1 && self.position < self.data.len() - 1 {
-            // Get ms bits
-            let mut v = self.data[self.position] & !(self.bit_marker - 1);
-            self.position += 1;
-            // Get ls bits
-            v |= self.data[self.position] & (self.bit_marker - 1);
-            Ok(v)
-        } else {
-            Err("Requested byte, but not enough data remains")
         }
     }
 
+    /// Pull a single bit from the stream
     fn pull_bit(&mut self) -> Result<bool, &'static str> {
-        if self.position < self.data.len() {
-            let byte = self.data[self.position];
-            let v = (byte & self.bit_marker) > 0;
+        if self.position >= self.data.len() {
+            Err("No data remaining")
+        } else {
+            let v = (self.data[self.position] & self.bit_marker) > 0;
 
-            println!("{:b}", self.bit_marker);
-
-            if self.bit_marker == (1 << 7) {
-                self.bit_marker = 1;
+            if self.bit_marker == (1 << 7)   {
                 self.position += 1;
+                self.bit_marker = 1;
+                self.bit_position = 0;
             } else {
                 self.bit_marker <<= 1;
+                self.bit_position += 1;
             }
             Ok(v)
+        }
+    }
+
+    /// Pull n bits from the stream (from current byte position only)
+    fn pull_bits(&mut self, n: u8) -> Result<u8, &'static str> {
+        assert!(n < 8);
+        if self.bit_position + n >= 8 {
+            Err("Requested more bits than what remains in the current byte")
         } else {
-            Err("Requested bit, but not enough data remains")
+            let marker = !((self.bit_marker - 1) | (!((self.bit_marker << n) - 1)));
+            let v = (self.data[self.position] & marker) >> self.bit_position;
+
+            if self.bit_position + n == 7 {
+                self.position += 1;
+                self.bit_marker = 1;
+                self.bit_position = 0;
+            } else {
+                self.bit_marker <<= n;
+                self.bit_position += n;
+            }
+            Ok(v)
         }
     }
 }
@@ -90,12 +109,14 @@ fn test_pull_bit() {
 }
 
 #[test]
-fn test_pull_byte_not_alligned() {
-    let data: [u8; 2] = [0b10000000, 0b11111101];
+fn test_pull_bits() {
+    let data: [u8; 2] = [0b10101010, 0b10010011];
     let mut stream = Stream::new(&data[..]);
 
-    assert_eq!(stream.pull_bit().unwrap(), false);
-    assert_eq!(stream.pull_byte().unwrap(), 0b10000001);
-    assert_eq!(stream.pull_bit().unwrap(), false);
-    assert_eq!(stream.pull_bit().unwrap(), true);
+    assert_eq!(stream.pull_bits(2).unwrap(), 0b10);
+    assert_eq!(stream.pull_bits(3).unwrap(), 0b010);
+    assert_eq!(stream.pull_bits(3).unwrap(), 0b101);
+    assert_eq!(stream.pull_bits(4).unwrap(), 0b0011);
+    assert_eq!(stream.pull_bits(1).unwrap(), 0b1);
+    assert_eq!(stream.pull_bits(3).unwrap(), 0b100);
 }
