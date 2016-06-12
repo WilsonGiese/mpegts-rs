@@ -60,7 +60,7 @@ impl<'a> Stream<'a> {
             // Bit twiddling ahead! It's dangerous to go alone, take these notes.
             // Produce a mask to extract the desired bits from the current marked position
             // Example:
-            // bit_marker = 00000100, byte = 1001110, n = 3
+            // bit_marker = 00000100, bit_position = 3, byte = 01001110, n = 3
             //
             // First get mask for unwanted least significant bits:
             //      bit_marker - 1 = 00000011
@@ -74,7 +74,9 @@ impl<'a> Stream<'a> {
             //      = 11100011
             // Finally, obtain the mask
             //      !11100011 = 00011100
-            // This mask can be used extract n bits from the current bit_marker
+            // This mask can be used extract n bits from the current byte
+            //      byte | 00011100 = 00011000
+            //      00011000 >> bit_position = 00000011
             let mask = !((self.bit_marker - 1) | !(((self.bit_marker as u16) << n) - 1) as u8);
             let v = (self.data[self.position] & mask) >> self.bit_position;
 
