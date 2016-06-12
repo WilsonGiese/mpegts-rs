@@ -10,4 +10,10 @@ pub struct PTSPacket {
     sync_byte: u8,
     transport_error_indicator: bool,
     payload_unit_start_indicator: bool,
+    transport_priority: bool,
+    pid: u16,
+    scrambling_control: u8,
+    adaptation_field_control: u8,
+    continuity_counter: u8,
+    // ... 
 }

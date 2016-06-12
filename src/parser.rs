@@ -93,6 +93,38 @@ impl<'a> Stream<'a> {
     }
 }
 
+impl PTSPacket {
+    fn parse(data: &[u8]) -> Result<PTSPacket, &'static str> {
+        let mut s = Stream::new(data);
+
+        Ok(PTSPacket {
+            sync_byte: try!(s.pull_byte()),
+            transport_error_indicator: try!(s.pull_bit()),
+            payload_unit_start_indicator: try!(s.pull_bit()),
+            transport_priority: try!(s.pull_bit()),
+            pid: ((try!(s.pull_bits(5)) as u16) << 8) | (try!(s.pull_byte()) as u16), // TODO Pstream implement pull_bits > 8
+            scrambling_control: try!(s.pull_bits(2)),
+            adaptation_field_control: try!(s.pull_bits(2)),
+            continuity_counter:try!(s.pull_bits(4)),
+        })
+    }
+}
+
+#[test]
+fn test_parse() {
+    let data: [u8; 4] = [0xFF, 0xFF, 0xFF, 0xFF];
+    let packet = PTSPacket::parse(&data[..]).unwrap();
+
+    assert_eq!(packet.sync_byte, 0xFF);
+    assert!(packet.transport_error_indicator);
+    assert!(packet.payload_unit_start_indicator);
+    assert!(packet.transport_priority);
+    assert_eq!(packet.pid, 0b0001111111111111);
+    assert_eq!(packet.scrambling_control, 0b00000011);
+    assert_eq!(packet.adaptation_field_control, 0b00000011);
+    assert_eq!(packet.continuity_counter, 0b00001111);
+}
+
 #[test]
 fn test_pull_byte() {
     let data: [u8; 6] = [0x1, 0x1, 0x2, 0x3, 0x5, 0x8];
