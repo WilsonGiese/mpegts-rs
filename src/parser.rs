@@ -51,15 +51,34 @@ impl<'a> Stream<'a> {
     }
 
     /// Pull n bits from the stream (from current byte position only)
+    /// Cannot pull more than 8 bits
     fn pull_bits(&mut self, n: u8) -> Result<u8, &'static str> {
         assert!(n < 8);
-        if self.bit_position + n >= 8 {
+        if self.bit_position + n > 8 {
             Err("Requested more bits than what remains in the current byte")
         } else {
-            let marker = !((self.bit_marker - 1) | (!((self.bit_marker << n) - 1)));
-            let v = (self.data[self.position] & marker) >> self.bit_position;
+            // Bit twiddling ahead! It's dangerous to go alone, take these notes.
+            // Produce a mask to extract the desired bits from the current marked position
+            // Example:
+            // bit_marker = 00000100, byte = 1001110, n = 3
+            //
+            // First get mask for unwanted least significant bits:
+            //      bit_marker - 1 = 00000011
+            // Next get mask for unwanted most siginifcant bits:
+            //      bit_marker << n = 00100000
+            //      00100000 - 1 = 00011111
+            //      !00011111 = 11100000
+            // Next combine the two results to get the mask for unwanted bits
+            //        00000011
+            //      | 11100000
+            //      = 11100011
+            // Finally, obtain the mask
+            //      !11100011 = 00011100
+            // This mask can be used extract n bits from the current bit_marker
+            let mask = !((self.bit_marker - 1) | !(((self.bit_marker as u16) << n) - 1) as u8);
+            let v = (self.data[self.position] & mask) >> self.bit_position;
 
-            if self.bit_position + n == 7 {
+            if self.bit_position + n == 8 {
                 self.position += 1;
                 self.bit_marker = 1;
                 self.bit_position = 0;
