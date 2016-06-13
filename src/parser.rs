@@ -1,5 +1,6 @@
 use super::{ PTSPacket };
 
+#[derive(Debug)]
 struct Stream<'a> {
     data: &'a[u8],
     position :usize,  // Current byte position in data
@@ -38,7 +39,7 @@ impl<'a> Stream<'a> {
         } else {
             let v = (self.data[self.position] & self.bit_marker) > 0;
 
-            if self.bit_marker == (1 << 7)   {
+            if self.bit_marker == (1 << 7) {
                 self.position += 1;
                 self.bit_marker = 1;
                 self.bit_position = 0;
@@ -53,8 +54,9 @@ impl<'a> Stream<'a> {
     /// Pull n bits from the stream (from current byte position only)
     /// Cannot pull more than 8 bits
     fn pull_bits(&mut self, n: u8) -> Result<u8, &'static str> {
-        assert!(n < 8);
-        if self.bit_position + n > 8 {
+        if n == 8 {
+            self.pull_byte()
+        } else if self.bit_position + n > 8 {
             Err("Requested more bits than what remains in the current byte")
         } else {
             // Bit twiddling ahead! It's dangerous to go alone, take these notes.
@@ -91,6 +93,17 @@ impl<'a> Stream<'a> {
             Ok(v)
         }
     }
+
+    /// Assumes BE at the moment, which is how MPEG-TS packs its bytes
+    fn pull_bits_u16(&mut self, n: u8) -> Result<u16, &'static str> {
+        if n > 16 {
+            Err("Requested more than what exists in a u16")
+        } else {
+            let n1 = 8 - self.bit_position;
+            let n2 = n - n1;
+            Ok((try!(self.pull_bits(n1)) as u16) << n2 | try!(self.pull_bits(n2)) as u16)
+        }
+    }
 }
 
 impl PTSPacket {
@@ -98,14 +111,14 @@ impl PTSPacket {
         let mut s = Stream::new(data);
 
         Ok(PTSPacket {
-            sync_byte: try!(s.pull_byte()),
-            transport_error_indicator: try!(s.pull_bit()),
+            sync_byte:                    try!(s.pull_byte()),
+            transport_error_indicator:    try!(s.pull_bit()),
             payload_unit_start_indicator: try!(s.pull_bit()),
-            transport_priority: try!(s.pull_bit()),
-            pid: ((try!(s.pull_bits(5)) as u16) << 8) | (try!(s.pull_byte()) as u16), // TODO Pstream implement pull_bits > 8
-            scrambling_control: try!(s.pull_bits(2)),
-            adaptation_field_control: try!(s.pull_bits(2)),
-            continuity_counter:try!(s.pull_bits(4)),
+            transport_priority:           try!(s.pull_bit()),
+            pid:                          try!(s.pull_bits_u16(13)),
+            scrambling_control:           try!(s.pull_bits(2)),
+            adaptation_field_control:     try!(s.pull_bits(2)),
+            continuity_counter:           try!(s.pull_bits(4)),
         })
     }
 }
@@ -172,4 +185,14 @@ fn test_pull_bits() {
     assert_eq!(stream.pull_bits(4).unwrap(), 0b0011);
     assert_eq!(stream.pull_bits(1).unwrap(), 0b1);
     assert_eq!(stream.pull_bits(3).unwrap(), 0b100);
+}
+
+#[test]
+fn test_pull_bits_u16() {
+    let data: [u8; 3] = [0b10010011, 0b10101010, 0b11110000];
+    let mut stream = Stream::new(&data[..]);
+
+    assert_eq!(stream.pull_bits_u16(9).unwrap(), 0b100100110);
+    assert_eq!(stream.pull_bits_u16(12).unwrap(), 0b101010110000);
+    assert_eq!(stream.pull_bits(3).unwrap(), 0b111);
 }
