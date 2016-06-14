@@ -131,8 +131,8 @@ fn test_parse() {
     let packet = PTSPacket::parse(&data[..]).unwrap();
 
     assert_eq!(packet.sync_byte, 0xFF);
-    assert!(packet.transport_error_indicator);
-    assert!(packet.payload_unit_start_indicator);
+    assert!(packet.transport_error);
+    assert!(packet.payload_unit_start);
     assert!(packet.transport_priority);
     assert_eq!(packet.pid, 0b0001111111111111);
     assert_eq!(packet.scrambling_control, 0b00000011);

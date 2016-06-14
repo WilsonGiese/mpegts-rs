@@ -54,5 +54,5 @@ pub struct AdaptationFieldExtension {
     piecewise_rate: u32,
     // Optional Seamless Splice Flag Set
     splice_type: u8,
-    dts_next_access_unit: u64, 
+    dts_next_access_unit: u64,
 }
