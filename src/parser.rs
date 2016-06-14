@@ -112,13 +112,15 @@ impl PTSPacket {
 
         Ok(PTSPacket {
             sync_byte:                    try!(s.pull_byte()),
-            transport_error_indicator:    try!(s.pull_bit()),
-            payload_unit_start_indicator: try!(s.pull_bit()),
+            transport_error:              try!(s.pull_bit()),
+            payload_unit_start:           try!(s.pull_bit()),
             transport_priority:           try!(s.pull_bit()),
             pid:                          try!(s.pull_bits_u16(13)),
             scrambling_control:           try!(s.pull_bits(2)),
             adaptation_field_control:     try!(s.pull_bits(2)),
             continuity_counter:           try!(s.pull_bits(4)),
+            adaptation_field: None, // TODO
+            payload: None, // TODO
         })
     }
 }
