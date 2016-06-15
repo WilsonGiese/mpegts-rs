@@ -4,8 +4,7 @@ use super::{ PTSPacket };
 struct Stream<'a> {
     data: &'a[u8],
     position :usize,  // Current byte position in data
-    bit_marker: u8,   // Current bit position in data
-    bit_position: u8, // Position of marked bit (Basically tracking log2(bit_marker))
+    bit_position: u8, // Current bit position in current byte
 }
 
 impl<'a> Stream<'a> {
@@ -14,14 +13,13 @@ impl<'a> Stream<'a> {
         Stream {
             data: data,
             position: 0,
-            bit_marker: 1,
             bit_position: 0,
         }
     }
 
     /// Pull a single byte from the stream (only allowed if bit position is alligned)
     fn pull_byte(&mut self) -> Result<u8, &'static str> {
-        if self.bit_marker > 1 {
+        if self.bit_position > 0 {
             Err("Requested byte, but bits have already been pulled from the current byte")
         } else if self.position >= self.data.len() {
             Err("No data remaining")
@@ -37,14 +35,12 @@ impl<'a> Stream<'a> {
         if self.position >= self.data.len() {
             Err("No data remaining")
         } else {
-            let v = (self.data[self.position] & self.bit_marker) > 0;
+            let v = (self.data[self.position] & (1 << self.bit_position)) > 0;
 
-            if self.bit_marker == (1 << 7) {
+            if self.bit_position == 7 {
                 self.position += 1;
-                self.bit_marker = 1;
                 self.bit_position = 0;
             } else {
-                self.bit_marker <<= 1;
                 self.bit_position += 1;
             }
             Ok(v)
@@ -79,15 +75,14 @@ impl<'a> Stream<'a> {
             // This mask can be used extract n bits from the current byte
             //      byte | 00011100 = 00011000
             //      00011000 >> bit_position = 00000011
-            let mask = !((self.bit_marker - 1) | !(((self.bit_marker as u16) << n) - 1) as u8);
+            let marker = 1 << self.bit_position;
+            let mask = !((marker - 1) | !(((marker as u16) << n) - 1) as u8);
             let v = (self.data[self.position] & mask) >> self.bit_position;
 
             if self.bit_position + n == 8 {
                 self.position += 1;
-                self.bit_marker = 1;
                 self.bit_position = 0;
             } else {
-                self.bit_marker <<= n;
                 self.bit_position += n;
             }
             Ok(v)
