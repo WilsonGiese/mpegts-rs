@@ -1,4 +1,4 @@
-use super::{ PTSPacket };
+use super::{ PTSPacket, AdaptationField, AdaptationFieldExtension };
 
 #[derive(Debug)]
 struct Stream<'a> {
@@ -105,18 +105,48 @@ impl PTSPacket {
     fn parse(data: &[u8]) -> Result<PTSPacket, &'static str> {
         let mut s = Stream::new(data);
 
-        Ok(PTSPacket {
-            sync_byte:                    try!(s.pull_byte()),
-            transport_error:              try!(s.pull_bit()),
-            payload_unit_start:           try!(s.pull_bit()),
-            transport_priority:           try!(s.pull_bit()),
-            pid:                          try!(s.pull_bits_u16(13)),
-            scrambling_control:           try!(s.pull_bits(2)),
-            adaptation_field_control:     try!(s.pull_bits(2)),
-            continuity_counter:           try!(s.pull_bits(4)),
-            adaptation_field: None, // TODO
-            payload: None, // TODO
-        })
+        let mut packet = PTSPacket::default();
+        packet.sync_byte             = try!(s.pull_byte());
+        packet.transport_error       = try!(s.pull_bit());
+        packet.payload_unit_start    = try!(s.pull_bit());
+        packet.transport_priority    = try!(s.pull_bit());
+        packet.pid                   = try!(s.pull_bits_u16(13));
+        packet.scrambling_control    = try!(s.pull_bits(2));
+        let adaptation_field_flag    = try!(s.pull_bit());
+        let payload_flag             = try!(s.pull_bit());
+        packet.continuity_counter    = try!(s.pull_bits(4));
+
+        if adaptation_field_flag {
+            let mut adaptation_field = AdaptationField::default();
+            adaptation_field.field_length               = try!(s.pull_byte());
+            adaptation_field.discontinuity              = try!(s.pull_bit());
+            adaptation_field.random_access              = try!(s.pull_bit());
+            adaptation_field.elementary_stream_priority = try!(s.pull_bit());
+            let pcr_flag                                = try!(s.pull_bit());
+            let opcr_flag                               = try!(s.pull_bit());
+            let splicing_point_flag                     = try!(s.pull_bit());
+            let transport_private_data_flag             = try!(s.pull_bit());
+            let adaptation_field_extension              = try!(s.pull_bit());
+
+            if pcr_flag {
+                // pcr = Read 48 bits
+            }
+
+            if opcr_flag {
+                // opcr = Read 48 bits
+            }
+
+            if splicing_point_flag {
+                // splice_countdown = Read byte
+            }
+
+            if transport_private_data_flag {
+                // transport_private_data_length = Read byte
+                // transport_private_data = Read transport_private_data_length bytes
+            }
+        }
+
+        Ok(packet)
     }
 }
 

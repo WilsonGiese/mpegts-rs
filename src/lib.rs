@@ -5,7 +5,7 @@
 mod parser;
 
 /// Partial Transport Stream Packet
-#[derive(Eq,PartialEq,Debug,Clone)]
+#[derive(Eq,PartialEq,Debug,Clone,Default)]
 pub struct PTSPacket {
     sync_byte: u8,
     transport_error: bool,
@@ -20,7 +20,7 @@ pub struct PTSPacket {
     payload: Option<Box<Vec<u8>>>
 }
 
-#[derive(Eq,PartialEq,Debug,Clone)]
+#[derive(Eq,PartialEq,Debug,Clone,Default)]
 pub struct AdaptationField {
     field_length: u8,
     discontinuity: bool,
@@ -41,7 +41,7 @@ pub struct AdaptationField {
     stuffing_bytes: Option<Box<Vec<u8>>>,
 }
 
-#[derive(Eq,PartialEq,Debug,Clone)]
+#[derive(Eq,PartialEq,Debug,Clone,Default)]
 pub struct AdaptationFieldExtension {
     adaptation_extension_length: u8,
     legal_time_window_flag: bool,
