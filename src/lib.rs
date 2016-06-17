@@ -13,7 +13,6 @@ pub struct PTSPacket {
     transport_priority: bool,
     pid: u16,
     scrambling_control: u8,
-    adaptation_field_control: u8,
     continuity_counter: u8,
     // Optional
     adaptation_field: Option<Box<AdaptationField>>,
@@ -26,11 +25,6 @@ pub struct AdaptationField {
     discontinuity: bool,
     random_access: bool,
     elementary_stream_priority: bool,
-    pcr_flag: bool,
-    opcr_flag: bool,
-    splicing_point_flag: bool,
-    transport_private_data_flag: bool,
-    adaptation_field_extension: bool,
     // Optional
     pcr: u64,
     opcr: u64,

@@ -144,6 +144,8 @@ impl PTSPacket {
                 // transport_private_data_length = Read byte
                 // transport_private_data = Read transport_private_data_length bytes
             }
+
+            packet.adaptation_field = Some(Box::new(adaptation_field));
         }
 
         Ok(packet)
@@ -152,7 +154,7 @@ impl PTSPacket {
 
 #[test]
 fn test_parse() {
-    let data: [u8; 4] = [0xFF, 0xFF, 0xFF, 0xFF];
+    let data: [u8; 8] = [0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF];
     let packet = PTSPacket::parse(&data[..]).unwrap();
 
     assert_eq!(packet.sync_byte, 0xFF);
@@ -161,7 +163,6 @@ fn test_parse() {
     assert!(packet.transport_priority);
     assert_eq!(packet.pid, 0b0001111111111111);
     assert_eq!(packet.scrambling_control, 0b00000011);
-    assert_eq!(packet.adaptation_field_control, 0b00000011);
     assert_eq!(packet.continuity_counter, 0b00001111);
 }
 
