@@ -1,7 +1,7 @@
-use super::{ PTSPacket, AdaptationField, AdaptationFieldExtension };
+//! Bit level stream (Big Endian)
 
 #[derive(Debug)]
-struct Stream<'a> {
+pub struct Stream<'a> {
     data: &'a[u8],
     position :usize,  // Current byte position in data
     bit_position: u8, // Current bit position in current byte
@@ -9,7 +9,7 @@ struct Stream<'a> {
 
 impl<'a> Stream<'a> {
 
-    fn new(data: &[u8]) -> Stream {
+    pub fn new(data: &[u8]) -> Stream {
         Stream {
             data: data,
             position: 0,
@@ -18,7 +18,7 @@ impl<'a> Stream<'a> {
     }
 
     /// Pull a single byte from the stream (only allowed if bit position is alligned)
-    fn pull_byte(&mut self) -> Result<u8, &'static str> {
+    pub fn pull_byte(&mut self) -> Result<u8, &'static str> {
         if self.bit_position > 0 {
             Err("Requested byte, but bits have already been pulled from the current byte")
         } else if self.position >= self.data.len() {
@@ -31,7 +31,7 @@ impl<'a> Stream<'a> {
     }
 
     /// Pull a single bit from the stream
-    fn pull_bit(&mut self) -> Result<bool, &'static str> {
+    pub fn pull_bit(&mut self) -> Result<bool, &'static str> {
         if self.position >= self.data.len() {
             Err("No data remaining")
         } else {
@@ -49,7 +49,7 @@ impl<'a> Stream<'a> {
 
     /// Pull n bits from the stream (from current byte position only)
     /// Cannot pull more than 8 bits
-    fn pull_bits(&mut self, n: u8) -> Result<u8, &'static str> {
+    pub fn pull_bits(&mut self, n: u8) -> Result<u8, &'static str> {
         if n == 8 {
             self.pull_byte()
         } else if self.bit_position + n > 8 {
@@ -90,7 +90,7 @@ impl<'a> Stream<'a> {
     }
 
     /// Assumes BE at the moment, which is how MPEG-TS packs its bytes
-    fn pull_bits_u16(&mut self, n: u8) -> Result<u16, &'static str> {
+    pub fn pull_bits_u16(&mut self, n: u8) -> Result<u16, &'static str> {
         if n > 16 {
             Err("Requested more than what exists in a u16")
         } else {
@@ -101,70 +101,6 @@ impl<'a> Stream<'a> {
     }
 }
 
-impl PTSPacket {
-    fn parse(data: &[u8]) -> Result<PTSPacket, &'static str> {
-        let mut s = Stream::new(data);
-
-        let mut packet = PTSPacket::default();
-        packet.sync_byte             = try!(s.pull_byte());
-        packet.transport_error       = try!(s.pull_bit());
-        packet.payload_unit_start    = try!(s.pull_bit());
-        packet.transport_priority    = try!(s.pull_bit());
-        packet.pid                   = try!(s.pull_bits_u16(13));
-        packet.scrambling_control    = try!(s.pull_bits(2));
-        let adaptation_field_flag    = try!(s.pull_bit());
-        let payload_flag             = try!(s.pull_bit());
-        packet.continuity_counter    = try!(s.pull_bits(4));
-
-        if adaptation_field_flag {
-            let mut adaptation_field = AdaptationField::default();
-            adaptation_field.field_length               = try!(s.pull_byte());
-            adaptation_field.discontinuity              = try!(s.pull_bit());
-            adaptation_field.random_access              = try!(s.pull_bit());
-            adaptation_field.elementary_stream_priority = try!(s.pull_bit());
-            let pcr_flag                                = try!(s.pull_bit());
-            let opcr_flag                               = try!(s.pull_bit());
-            let splicing_point_flag                     = try!(s.pull_bit());
-            let transport_private_data_flag             = try!(s.pull_bit());
-            let adaptation_field_extension              = try!(s.pull_bit());
-
-            if pcr_flag {
-                // pcr = Read 48 bits
-            }
-
-            if opcr_flag {
-                // opcr = Read 48 bits
-            }
-
-            if splicing_point_flag {
-                // splice_countdown = Read byte
-            }
-
-            if transport_private_data_flag {
-                // transport_private_data_length = Read byte
-                // transport_private_data = Read transport_private_data_length bytes
-            }
-
-            packet.adaptation_field = Some(Box::new(adaptation_field));
-        }
-
-        Ok(packet)
-    }
-}
-
-#[test]
-fn test_parse() {
-    let data: [u8; 8] = [0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF];
-    let packet = PTSPacket::parse(&data[..]).unwrap();
-
-    assert_eq!(packet.sync_byte, 0xFF);
-    assert!(packet.transport_error);
-    assert!(packet.payload_unit_start);
-    assert!(packet.transport_priority);
-    assert_eq!(packet.pid, 0b0001111111111111);
-    assert_eq!(packet.scrambling_control, 0b00000011);
-    assert_eq!(packet.continuity_counter, 0b00001111);
-}
 
 #[test]
 fn test_pull_byte() {
